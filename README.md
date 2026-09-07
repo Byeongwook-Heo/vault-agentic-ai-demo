@@ -2,11 +2,19 @@
 
 [한국어](README.md) · [English](README.en.md)
 
-**사용자 인증은 IBM Verify, Agent 신원은 KMS 서명, 비밀정보와 DB 권한은 Vault.**
+**사용자 인증과 위임은 IBM Verify, 자격증명과 데이터 접근제어는 Vault.**
+
+## 목적
 
 AI Agent가 사용자를 대신해 주문 데이터를 조회할 때, 누가 요청했는지와 어떤 범위까지 허용되는지를 보여주는 데모입니다. IBM Verify, ContextForge MCP Gateway, HashiCorp Vault Enterprise, Amazon RDS for PostgreSQL을 연결합니다.
 
-이 저장소는 별도 관리용으로 분리한 배포 템플릿입니다. 실제 계정·테넌트·접속 주소·사용자 이름·개인 경로·자격증명은 포함하지 않습니다. 화면은 Carbon 디자인 요소를 활용한 커스텀 UI이며, 공식 IBM 제품 UI 자체는 아닙니다.
+화면은 Carbon 디자인 요소를 활용한 커스텀 UI이며, 공식 IBM 제품 UI 자체는 아닙니다.
+
+## 기대 효과
+
+- 사용자 인증, Agent 신원, 위임과 데이터 권한의 차이를 하나의 요청 흐름으로 이해합니다.
+- 전체·제한·미승인 사용자의 결과를 비교해 권한이 적용되는 지점을 확인합니다.
+- 모델에 DB 비밀번호를 전달하지 않고 단기 자격증명으로 조회하는 패턴을 학습합니다.
 
 ## 챗봇 UI
 

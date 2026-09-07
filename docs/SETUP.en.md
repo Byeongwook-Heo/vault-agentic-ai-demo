@@ -2,7 +2,7 @@
 
 [한국어](SETUP.ko.md) · [README](../README.en.md)
 
-Use an isolated AWS lab environment. The original operator's live configuration is intentionally absent. Source/test validation of this export is not a fresh-account deployment certification.
+Use an isolated AWS lab environment. Passing source tests does not establish deployment success. Verify connectivity, authentication, and authorization in the target environment after deployment.
 
 ## Prerequisites
 

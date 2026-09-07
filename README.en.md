@@ -2,11 +2,19 @@
 
 [한국어](README.md) · [English](README.en.md)
 
-**IBM Verify authenticates users. KMS proves the Agent identity. Vault controls credentials and database access.**
+**IBM Verify handles authentication and delegation. Vault controls credentials and data access.**
+
+## Purpose
 
 This demo shows an AI Agent querying protected order data on behalf of a user through IBM Verify, ContextForge MCP Gateway, HashiCorp Vault Enterprise and Amazon RDS for PostgreSQL.
 
-This standalone repository contains a deployment template, not the original live environment's configuration. Real accounts, tenant addresses, users, personal filesystem paths and credentials are excluded. The custom UI uses Carbon design elements; it is not an official IBM product interface.
+The custom UI uses Carbon design elements; it is not an official IBM product interface.
+
+## Benefits
+
+- Distinguish user authentication, Agent identity, delegation, and data authorization within one request.
+- Compare full, limited, and unapproved users to see where access restrictions apply.
+- Learn short-lived credential access without passing database passwords to the model.
 
 ## Chatbot UI
 
