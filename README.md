@@ -51,11 +51,13 @@ sequenceDiagram
     participant M as MCP Server
     participant H as Vault
     participant D as PostgreSQL
+    opt Verify 로그인 선택 시
     U->>B: Verify 로그인 선택
     B->>V: Authorization Code + PKCE
     V->>U: 사용자 인증
     V-->>B: 코드 교환 후 사용자 Access JWT
     Note over U,B: 브라우저에는 암호화된 HttpOnly 세션 쿠키
+    end
     U->>B: 자연어 질문
     alt 일반 대화 / 구성 설명
         B-->>U: AI 응답 (보호된 DB 접근 없음)

@@ -48,11 +48,13 @@ sequenceDiagram
     participant M as MCP Server
     participant H as Vault
     participant D as PostgreSQL
+    opt User chooses Verify login
     U->>B: Select Verify login
     B->>V: Authorization Code + PKCE
     V->>U: Authenticate user
     V-->>B: User Access JWT after code exchange
     Note over U,B: Browser receives an encrypted HttpOnly session cookie
+    end
     U->>B: Natural-language request
     alt General conversation
         B-->>U: AI response without protected DB access
