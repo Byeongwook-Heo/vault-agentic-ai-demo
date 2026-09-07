@@ -46,7 +46,6 @@ sequenceDiagram
     actor U as 사용자
     participant B as 챗봇 / Bob Agent
     participant V as IBM Verify
-    participant K as AWS KMS
     participant G as ContextForge Gateway
     participant M as MCP Server
     participant H as Vault
@@ -67,9 +66,7 @@ sequenceDiagram
             B-->>U: 접근 거부 / 로그인·권한 안내
             Note over B,D: OBO 교환 및 MCP·Vault·DB 호출 없음
         else orders-full 또는 orders-limited
-            B->>K: Agent client assertion 서명 요청
-            K-->>B: private_key_jwt
-            B->>V: Token Exchange (subject_token = 사용자 JWT)
+            B->>V: Token Exchange (사용자 JWT + Agent client_assertion)
             V-->>B: OBO JWT (sub, aud, client_id, access_tier)
             B->>B: OBO JWT 검증
             B->>G: Gateway 토큰 + upstream OBO JWT

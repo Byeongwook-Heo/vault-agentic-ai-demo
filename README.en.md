@@ -43,7 +43,6 @@ sequenceDiagram
     actor U as User
     participant B as Chatbot / Bob Agent
     participant V as IBM Verify
-    participant K as AWS KMS
     participant G as ContextForge Gateway
     participant M as MCP Server
     participant H as Vault
@@ -64,9 +63,7 @@ sequenceDiagram
             B-->>U: Deny protected access / explain requirements
             Note over B,D: No OBO exchange, MCP, Vault or DB call
         else orders-full or orders-limited
-            B->>K: Sign Agent client assertion
-            K-->>B: private_key_jwt
-            B->>V: Token Exchange with user JWT as subject_token
+            B->>V: Token Exchange (user JWT + Agent client_assertion)
             V-->>B: OBO JWT (sub, aud, client_id, access_tier)
             B->>B: Validate OBO JWT
             B->>G: Gateway token + upstream OBO JWT
