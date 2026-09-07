@@ -1,0 +1,484 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWS-only build plane for the Bob, Verify, Vault NHI demo.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: bob-vault-nhi-demo
+    AllowedPattern: "^[a-z0-9-]+$"
+  ArtifactBucketName:
+    Type: String
+  ExistingVpcId:
+    Type: AWS::EC2::VPC::Id
+  AppSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  TerraformStateBucket:
+    Type: String
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref ArtifactBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-build-artifacts
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 14
+            ExpirationInDays: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  ArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt ArtifactBucket.Arn
+              - !Sub "${ArtifactBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  ImageRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: !Ref ProjectName
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+              "rulePriority": 1,
+              "description": "Keep the 20 newest images",
+              "selection": {
+                "tagStatus": "any",
+                "countType": "imageCountMoreThan",
+                "countNumber": 20
+              },
+              "action": {"type": "expire"}
+            }]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  BuildSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Egress for private CodeBuild bootstrap jobs
+      VpcId: !Ref ExistingVpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS APIs and package repositories through NAT
+        - IpProtocol: tcp
+          FromPort: 8200
+          ToPort: 8200
+          CidrIp: 10.0.0.0/8
+          Description: Private Vault listener
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 10.0.0.0/8
+          Description: Private PostgreSQL
+        - IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+          Description: DNS
+        - IpProtocol: tcp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+          Description: DNS fallback
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-codebuild"
+        - Key: Project
+          Value: !Ref ProjectName
+
+  CodeBuildBaseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codebuild-base"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs-and-source
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+                  - s3:PutObject
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub "${ArtifactBucket.Arn}/*"
+
+  CiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codebuild-ci"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref BasePolicy
+      Policies:
+        - PolicyName: test-reports
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:CreateReportGroup
+                  - codebuild:CreateReport
+                  - codebuild:UpdateReport
+                  - codebuild:BatchPutTestCases
+                  - codebuild:BatchPutCodeCoverages
+                Resource: !Sub "arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${ProjectName}-ci-*"
+
+  ImageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codebuild-image"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref BasePolicy
+      Policies:
+        - PolicyName: ecr-publish
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecr:DescribeImages
+                Resource: !GetAtt ImageRepository.Arn
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/image-uri"
+
+  TerraformRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codebuild-terraform"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref BasePolicy
+      Policies:
+        - PolicyName: terraform-state
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketVersioning
+                  - s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${TerraformStateBucket}"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${TerraformStateBucket}/${ProjectName}/*"
+        - PolicyName: terraform-managed-services
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - acm:*
+                  - ec2:*
+                  - ecs:*
+                  - elasticloadbalancing:*
+                  - ecr:Describe*
+                  - ecr:GetLifecyclePolicy
+                  - ecr:GetRepositoryPolicy
+                  - ecr:ListTagsForResource
+                  - iam:*
+                  - kms:*
+                  - logs:*
+                  - rds:*
+                  - route53:*
+                  - secretsmanager:*
+                  - ssm:*
+                Resource: "*"
+
+  BootstrapRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codebuild-bootstrap"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref BasePolicy
+      Policies:
+        - PolicyName: private-bootstrap
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeDhcpOptions
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcs
+                  - ec2:CreateNetworkInterfacePermission
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:Encrypt
+                  - kms:GenerateDataKey*
+                  - kms:GetPublicKey
+                  - kms:Sign
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:DeleteSecret
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:PutParameter
+                Resource: "*"
+
+  BasePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${ProjectName}-codebuild-source"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-*"
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:GetBucketVersioning
+            Resource:
+              - !GetAtt ArtifactBucket.Arn
+              - !Sub "${ArtifactBucket.Arn}/*"
+
+  CiProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-ci"
+      ServiceRole: !GetAtt CiRole.Arn
+      Source:
+        Type: S3
+        Location: !Sub "${ArtifactBucket}/source/${ProjectName}.zip"
+        BuildSpec: buildspec/ci.yml
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: CI_TARGET
+            Value: ci
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  ImageProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-image"
+      ServiceRole: !GetAtt ImageRole.Arn
+      Source:
+        Type: S3
+        Location: !Sub "${ArtifactBucket}/source/${ProjectName}.zip"
+        BuildSpec: buildspec/image.yml
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: PROJECT_NAME
+            Value: !Ref ProjectName
+          - Name: ECR_REPOSITORY_URI
+            Value: !GetAtt ImageRepository.RepositoryUri
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  TerraformProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-terraform"
+      ServiceRole: !GetAtt TerraformRole.Arn
+      Source:
+        Type: S3
+        Location: !Sub "${ArtifactBucket}/source/${ProjectName}.zip"
+        BuildSpec: buildspec/terraform.yml
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - Name: PROJECT_NAME
+            Value: !Ref ProjectName
+          - Name: TF_STATE_BUCKET
+            Value: !Ref TerraformStateBucket
+          - Name: TF_STATE_KEY
+            Value: !Sub "${ProjectName}/terraform.tfstate"
+          - Name: TF_ACTION
+            Value: plan
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+      TimeoutInMinutes: 60
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  BootstrapProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-bootstrap"
+      ServiceRole: !GetAtt BootstrapRole.Arn
+      Source:
+        Type: S3
+        Location: !Sub "${ArtifactBucket}/source/${ProjectName}.zip"
+        BuildSpec: buildspec/bootstrap.yml
+      Artifacts:
+        Type: NO_ARTIFACTS
+      VpcConfig:
+        VpcId: !Ref ExistingVpcId
+        Subnets: !Ref AppSubnetIds
+        SecurityGroupIds:
+          - !Ref BuildSecurityGroup
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - Name: PROJECT_NAME
+            Value: !Ref ProjectName
+          - Name: BOOTSTRAP_ACTION
+            Value: status
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+Outputs:
+  ArtifactBucket:
+    Value: !Ref ArtifactBucket
+  EcrRepositoryUri:
+    Value: !GetAtt ImageRepository.RepositoryUri
+  BuildSecurityGroupId:
+    Value: !Ref BuildSecurityGroup
+  CiProject:
+    Value: !Ref CiProject
+  ImageProject:
+    Value: !Ref ImageProject
+  TerraformProject:
+    Value: !Ref TerraformProject
+  BootstrapProject:
+    Value: !Ref BootstrapProject

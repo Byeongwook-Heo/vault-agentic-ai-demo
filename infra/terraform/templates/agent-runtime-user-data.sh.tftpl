@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+export DEBIAN_FRONTEND=noninteractive
+find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://|https://|g' {} +
+apt-get update
+apt-get install -y --no-install-recommends ca-certificates curl jq zstd nginx
+if ! command -v aws >/dev/null; then
+  apt-get install -y --no-install-recommends awscli
+fi
+
+# Pinned official release; no installer is executed from the network.
+archive="$(mktemp)"
+trap 'rm -f "$archive"' EXIT
+curl --fail --silent --show-error --location --retry 3 \
+  https://github.com/ollama/ollama/releases/download/v0.33.3/ollama-linux-amd64.tar.zst \
+  --output "$archive"
+printf '%s  %s\n' c13cea8f3389db4145f8a6cb88d1747242a48639d7c13e3bda7c1ebdc6eebb2f "$archive" | sha256sum -c -
+# The archive omits this parent directory. With umask 077, tar would create
+# it root-only and the unprivileged service could not load its runtime.
+install -d -m 0755 -o root -g root /usr/local/lib/ollama
+tar --zstd -xf "$archive" -C /usr/local
+
+id agent-runtime >/dev/null 2>&1 || useradd --system --create-home --home-dir /var/lib/agent-runtime --shell /usr/sbin/nologin agent-runtime
+install -d -m 0750 -o agent-runtime -g agent-runtime /var/lib/agent-runtime/models
+runuser -u agent-runtime -- test -x /usr/local/lib/ollama/llama-server
+
+cat > /etc/systemd/system/agent-runtime.service <<'UNIT'
+[Unit]
+Description=Private lab inference service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agent-runtime
+Group=agent-runtime
+Environment=OLLAMA_HOST=127.0.0.1:11435
+Environment=OLLAMA_MODELS=/var/lib/agent-runtime/models
+Environment=OLLAMA_KEEP_ALIVE=-1
+Environment=OLLAMA_CONTEXT_LENGTH=4096
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_NO_CLOUD=1
+ExecStart=/usr/local/bin/ollama serve
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/agent-runtime
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now agent-runtime
+for attempt in $(seq 1 30); do
+  if curl -fsS http://127.0.0.1:11435/api/tags >/dev/null; then break; fi
+  sleep 2
+done
+
+runtime_token="$(aws secretsmanager get-secret-value --region '${aws_region}' --secret-id '${secret_id}' --query SecretString --output text)"
+[[ "$runtime_token" =~ ^[A-Za-z0-9._~+/=-]{16,512}$ ]] || { echo 'Invalid runtime token format'; exit 1; }
+cat > /etc/nginx/conf.d/agent-runtime.conf <<NGINX
+map_hash_bucket_size 1024;
+map \$http_authorization \$agent_authorized {
+    default 0;
+    "Bearer $runtime_token" 1;
+}
+server {
+    listen 11434;
+    server_tokens off;
+    access_log off;
+    client_max_body_size 64k;
+    location = /healthz { return 200 'ready'; }
+    location ~ ^/api/(chat|tags)$ {
+        if (\$agent_authorized = 0) { return 401; }
+        proxy_pass http://127.0.0.1:11435;
+        proxy_http_version 1.1;
+        proxy_set_header Authorization "";
+        proxy_read_timeout 90s;
+    }
+    location / { return 404; }
+}
+NGINX
+unset runtime_token
+chmod 0600 /etc/nginx/conf.d/agent-runtime.conf
+if [ -L /etc/nginx/sites-enabled/default ]; then unlink /etc/nginx/sites-enabled/default; fi
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
+
+curl --fail --silent --show-error --max-time 900 http://127.0.0.1:11435/api/pull \
+  -H 'Content-Type: application/json' \
+  --data '{"model":"${model}","stream":false}' \
+  | jq -e '.status == "success"' >/dev/null
+curl --fail --silent --show-error --max-time 180 http://127.0.0.1:11435/api/chat \
+  -H 'Content-Type: application/json' \
+  --data '{"model":"${model}","messages":[{"role":"user","content":"안녕하세요. 짧게 인사해주세요."}],"think":false,"stream":false,"keep_alive":-1,"options":{"num_predict":32}}' \
+  | jq -e '.done == true and (.message.content | length > 0)' >/dev/null
+echo 'Private inference model loaded successfully.'

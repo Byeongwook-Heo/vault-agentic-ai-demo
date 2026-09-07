@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "secure-aws-database": {
+      "type": "streamable-http",
+      "url": "https://bob-vault-demo.demo.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_TRANSPORT_TOKEN}"
+      },
+      "alwaysAllow": [],
+      "disabled": false
+    }
+  }
+}

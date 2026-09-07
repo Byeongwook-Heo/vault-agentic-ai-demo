@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Agentic Security Lab MCP Server의 공개 상태와 보안 제어를 확인하는 읽기 전용 Inspector"
+    />
+    <title>MCP Server Inspector | Agentic Security Lab</title>
+    <script src="/theme.js?v=20260803-motion2"></script>
+    <link rel="stylesheet" href="/ibm-ui.css?v=20260803-motion2" />
+    <link rel="stylesheet" href="/styles.css?v=20260803-motion2" />
+    <link rel="stylesheet" href="/mcp-inspector.css?v=20260803-motion2" />
+    <script src="/mcp-inspector.js?v=20260803-motion2" type="module"></script>
+  </head>
+  <body class="inspector-page">
+    <header class="inspector-topbar">
+      <a class="inspector-brand" href="/">
+        <img
+          src="/icons/custom/hashicorp-vault.svg"
+          alt=""
+          width="28"
+          height="32"
+        />
+        <span>
+          <small>Agentic Security Lab</small>
+          <strong>MCP Server Inspector</strong>
+        </span>
+      </a>
+      <div class="inspector-topbar-actions">
+        <span class="inspector-readonly">
+          <span class="carbon-icon icon-locked" aria-hidden="true"></span>
+          읽기 전용
+        </span>
+        <button
+          class="theme-toggle inspector-theme-toggle"
+          id="inspector-theme-toggle"
+          type="button"
+          aria-pressed="false"
+        >
+          <span class="theme-symbol" aria-hidden="true">☼</span>
+          <span class="theme-switch" aria-hidden="true">
+            <span class="theme-toggle-dot"></span>
+          </span>
+          <span class="sr-only" id="inspector-theme-label">다크 모드</span>
+        </button>
+        <a class="inspector-back" href="/">Lab으로 돌아가기</a>
+      </div>
+    </header>
+
+    <main class="inspector-main">
+      <section class="inspector-hero" aria-labelledby="inspector-title">
+        <div>
+          <p class="eyebrow">PUBLIC RUNTIME VIEW</p>
+          <h1 id="inspector-title">MCP 요청 경계를 안전하게 확인합니다</h1>
+          <p>
+            이 화면은 서비스가 공개하도록 설계한 상태, 보안 제어, Endpoint와
+            도구 카탈로그만 보여줍니다. Bearer token, OBO JWT, Vault token,
+            데이터베이스 자격증명은 읽거나 실행하지 않습니다.
+          </p>
+        </div>
+        <div class="inspector-health" id="inspector-health" aria-live="polite">
+          <span class="inspector-health-dot" aria-hidden="true"></span>
+          <span>
+            <small>서비스 상태</small>
+            <strong id="inspector-health-label">확인 중</strong>
+          </span>
+        </div>
+      </section>
+
+      <section class="inspector-grid" aria-label="MCP 공개 상태">
+        <article class="inspector-panel inspector-runtime-panel">
+          <header>
+            <span class="carbon-icon icon-network" aria-hidden="true"></span>
+            <div>
+              <p>Runtime</p>
+              <h2>서비스 정보</h2>
+            </div>
+          </header>
+          <dl class="inspector-facts">
+            <div>
+              <dt>모드</dt>
+              <dd id="inspector-mode">—</dd>
+            </div>
+            <div>
+              <dt>버전</dt>
+              <dd id="inspector-version">—</dd>
+            </div>
+            <div>
+              <dt>MCP 프로토콜</dt>
+              <dd id="inspector-protocol">—</dd>
+            </div>
+            <div>
+              <dt>Agent 계획</dt>
+              <dd id="inspector-planning">—</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="inspector-panel inspector-controls-panel">
+          <header>
+            <span
+              class="carbon-icon icon-security-services"
+              aria-hidden="true"
+            ></span>
+            <div>
+              <p>Controls</p>
+              <h2>적용된 보안 제어</h2>
+            </div>
+          </header>
+          <dl class="inspector-control-list">
+            <div>
+              <dt>전송 인증</dt>
+              <dd id="inspector-transport">—</dd>
+            </div>
+            <div>
+              <dt>워크로드 신원</dt>
+              <dd id="inspector-workload">—</dd>
+            </div>
+            <div>
+              <dt>권한 부여</dt>
+              <dd id="inspector-authorization">—</dd>
+            </div>
+            <div>
+              <dt>자격증명</dt>
+              <dd id="inspector-credentials">—</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="inspector-panel inspector-endpoints-panel">
+          <header>
+            <span
+              class="carbon-icon icon-connection-send"
+              aria-hidden="true"
+            ></span>
+            <div>
+              <p>Endpoints</p>
+              <h2>공개 Endpoint</h2>
+            </div>
+          </header>
+          <ul class="inspector-endpoints">
+            <li>
+              <span class="method get">GET</span>
+              <code>/healthz</code>
+              <small>민감 설정을 제외한 상태</small>
+            </li>
+            <li>
+              <span class="method get">GET</span>
+              <code>/api/status</code>
+              <small>보안 제어 요약</small>
+            </li>
+            <li>
+              <span class="method get">GET</span>
+              <code>/.well-known/jwks.json</code>
+              <small>Agent 공개 서명 키</small>
+            </li>
+            <li>
+              <span class="method post">POST</span>
+              <code>/mcp</code>
+              <small>Verify 사용자 JWT 필요</small>
+            </li>
+          </ul>
+        </article>
+
+        <article class="inspector-panel inspector-tools-panel">
+          <header>
+            <span class="carbon-icon icon-bot" aria-hidden="true"></span>
+            <div>
+              <p>Tool catalog</p>
+              <h2>허용된 도구</h2>
+            </div>
+          </header>
+          <ul class="inspector-tools">
+            <li>
+              <code>get_order_status</code>
+              <span>주문 상태 조회</span>
+              <strong>READ</strong>
+            </li>
+            <li>
+              <code>get_recent_orders</code>
+              <span>최근 주문 조회</span>
+              <strong>READ</strong>
+            </li>
+            <li>
+              <code>get_failed_payment_summary</code>
+              <span>실패 결제 요약 조회</span>
+              <strong>READ</strong>
+            </li>
+            <li>
+              <code>get_failed_payment_trend</code>
+              <span>실패 결제 통계 조회</span>
+              <strong>READ</strong>
+            </li>
+            <li class="denied-tool">
+              <code>get_sensitive_payment_data</code>
+              <span>민감 정보 정책 확인</span>
+              <strong>DENY</strong>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <aside class="inspector-boundary" aria-label="Inspector 안전 경계">
+        <span class="carbon-icon icon-locked" aria-hidden="true"></span>
+        <div>
+          <strong>Inspector 안전 경계</strong>
+          <p>
+            도구 실행, 인증 토큰 입력, Vault lease 발급, SQL 실행 기능을
+            제공하지 않습니다. 실제 요청 결과는 Lab 대화 화면과 접근제어
+            기록에서 확인하세요.
+          </p>
+        </div>
+      </aside>
+    </main>
+  </body>
+</html>

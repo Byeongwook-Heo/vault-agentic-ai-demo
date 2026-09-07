@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="IBM Verify 사용자 인증과 OBO 교환, ContextForge MCP Gateway, Vault 동적 권한, PostgreSQL 접근을 한 화면에서 보여주는 Agentic Security Lab"
+    />
+    <title>Agentic Security Lab | 대화 · 접근제어</title>
+    <link
+      rel="icon"
+      href="/icons/custom/hashicorp-vault.svg"
+      type="image/svg+xml"
+    />
+    <script src="/theme.js?v=20260812-carbon5"></script>
+    <link rel="stylesheet" href="/ibm-ui.css?v=20260812-carbon5" />
+    <link rel="stylesheet" href="/styles.css?v=20260907-composer" />
+    <script src="/app.js?v=20260907-session" type="module"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Agentic Security Lab 홈">
+        <img
+          class="brand-mark"
+          src="/icons/custom/hashicorp-vault.svg"
+          alt=""
+          width="32"
+          height="32"
+        />
+        <strong>Agentic Security Lab</strong>
+      </a>
+
+      <nav class="topnav" id="topnav" aria-label="주요 영역" hidden>
+        <a href="#chat-section">대화</a>
+        <a href="#control-center">접근제어</a>
+      </nav>
+
+      <div class="topbar-actions">
+        <button
+          class="theme-toggle"
+          id="theme-toggle"
+          type="button"
+          aria-pressed="false"
+        >
+          <span class="theme-symbol" aria-hidden="true">☼</span>
+          <span class="theme-switch" aria-hidden="true">
+            <span class="theme-toggle-dot"></span>
+          </span>
+          <span class="sr-only" id="theme-toggle-label">다크 모드</span>
+        </button>
+
+        <a class="header-login" id="header-login" href="/auth/login">
+          IBM Verify 로그인
+        </a>
+
+        <div class="identity" id="identity" hidden>
+          <span class="user-initial" id="user-initial" aria-hidden="true"
+            >U</span
+          >
+          <span class="identity-copy">
+            <small id="identity-state">Verify 인증 완료</small>
+            <strong id="user-name">—</strong>
+          </span>
+          <button class="logout-button" id="logout" type="button">
+            <span class="carbon-icon icon-logout" aria-hidden="true"></span>
+            <span class="sr-only">로그아웃</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="landing-shell" id="login-panel" hidden>
+        <div class="landing-copy">
+          <p class="eyebrow">주문 조회 · 접근제어</p>
+          <h1>권한 범위에서<br />주문 정보를 조회합니다</h1>
+          <p class="landing-body">
+            IBM Verify로 로그인하면 계정에 허용된 주문만 조회할 수 있습니다. 각
+            요청의 인증, 정책 평가, 데이터 접근 기록은 접근제어 화면에서
+            확인합니다.
+          </p>
+
+          <div class="landing-points" aria-label="적용되는 핵심 보안 제어">
+            <article>
+              <img
+                src="/icons/ibm-security-verify.svg"
+                alt=""
+                width="24"
+                height="24"
+              />
+              <div>
+                <strong>IBM Verify</strong>
+                <p>사용자 신원과 로그인 세션을 검증합니다.</p>
+              </div>
+            </article>
+            <article>
+              <img
+                src="/icons/custom/hashicorp-vault.svg"
+                alt=""
+                width="24"
+                height="24"
+              />
+              <div>
+                <strong>Vault 최소 권한</strong>
+                <p>사용자·에이전트 클레임으로 DB 역할을 제한합니다.</p>
+              </div>
+            </article>
+            <article>
+              <img
+                class="postgresql-logo"
+                src="/icons/custom/postgresql-elephant.svg"
+                alt=""
+                width="24"
+                height="25"
+              />
+              <div>
+                <strong>동적 PostgreSQL 접근</strong>
+                <p>짧은 TTL의 읽기 전용 계정만 발급합니다.</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="landing-actions">
+            <a class="primary-action" href="/auth/login">
+              IBM Verify로 로그인
+              <span class="carbon-icon icon-launch" aria-hidden="true"></span>
+            </a>
+            <button class="secondary-action" id="unauth-test" type="button">
+              미승인 사용자로 로그인
+            </button>
+          </div>
+
+          <p id="preview-status" class="preview-status" role="status">
+            서비스 구성을 확인하는 중입니다.
+          </p>
+
+          <p class="login-error" id="login-error" role="alert" hidden>
+            로그인을 완료하지 못했습니다. 다시 시도해 주세요.
+          </p>
+        </div>
+
+        <div class="landing-visual" aria-label="Bob AI 에이전트">
+          <img
+            class="hero-bob"
+            src="/images/bob-agent.png"
+            alt=""
+            width="300"
+            height="470"
+          />
+          <section class="unauth-demo" aria-labelledby="unauth-demo-title">
+            <div class="unauth-demo-heading">
+              <div>
+                <span>NEGATIVE PATH</span>
+                <h2 id="unauth-demo-title">로그인했지만 권한이 없다면?</h2>
+              </div>
+              <span class="unauth-demo-result waiting" id="unauth-result"
+                >테스트 전</span
+              >
+            </div>
+            <p>
+              Verify 인증은 성공하지만 보호 데이터 access_tier가 없는 사용자가
+              어디서 차단되는지 확인합니다.
+            </p>
+            <ol class="unauth-path" id="unauth-path">
+              <li data-unauth-stage="verify">
+                <strong>Verify</strong><span>로그인 대기</span>
+              </li>
+              <li data-unauth-stage="agent">
+                <strong>Application</strong><span>권한 대기</span>
+              </li>
+              <li data-unauth-stage="mcp">
+                <strong>Agent·MCP</strong><span>미실행</span>
+              </li>
+              <li data-unauth-stage="vault">
+                <strong>Vault</strong><span>미실행</span>
+              </li>
+              <li data-unauth-stage="database">
+                <strong>DB</strong><span>미실행</span>
+              </li>
+            </ol>
+            <div class="unauth-outcome" id="unauth-outcome" role="status">
+              데모 사용자는 인증되지만 Lab 접근 권한은 부여되지 않습니다.
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace" hidden>
+        <section class="console-layout">
+          <section
+            class="chat-surface"
+            id="chat-section"
+            aria-labelledby="chat-title"
+          >
+            <header class="panel-header">
+              <div class="panel-title">
+                <span class="carbon-icon icon-bot" aria-hidden="true"></span>
+                <h2 id="chat-title">대화</h2>
+              </div>
+              <span class="panel-context" id="access-context"
+                >사용자 상태 확인 중</span
+              >
+            </header>
+
+            <div class="chat-scroll">
+              <section
+                class="access-mode-banner unapproved"
+                id="access-mode-banner"
+                aria-live="polite"
+              >
+                <span class="access-mode-icon" aria-hidden="true">
+                  <span class="carbon-icon icon-locked"></span>
+                </span>
+                <span class="access-mode-copy">
+                  <strong id="access-mode-title">미승인 사용자 모드</strong>
+                  <span id="access-mode-description"
+                    >일반 대화와 Lab 안내는 사용할 수 있지만 보호 데이터 조회는
+                    차단됩니다.</span
+                  >
+                </span>
+                <a href="/auth/login" id="access-mode-login"
+                  >IBM Verify 로그인</a
+                >
+              </section>
+
+              <section class="agent-intro" aria-labelledby="agent-title">
+                <div class="agent-figure">
+                  <img
+                    src="/images/bob-agent.png"
+                    alt=""
+                    width="180"
+                    height="268"
+                  />
+                </div>
+                <div class="agent-copy">
+                  <h1 id="agent-title">Bob AI 에이전트</h1>
+                  <p id="agent-greeting">안녕하세요!</p>
+                  <p>
+                    주문 번호나 확인할 내용을 입력하세요.<br />현재 계정에
+                    허용된 범위에서 조회합니다.
+                  </p>
+
+                  <div class="suggestion-panel">
+                    <div class="suggestion-heading">
+                      <span>
+                        <small>추천 프롬프트</small>
+                        <strong>샘플 요청</strong>
+                      </span>
+                      <button
+                        id="shuffle-suggestions"
+                        type="button"
+                        aria-label="다른 샘플 요청 보기"
+                      >
+                        <span
+                          class="carbon-icon icon-renew"
+                          aria-hidden="true"
+                        ></span>
+                        다른 요청
+                      </button>
+                    </div>
+                    <div
+                      class="suggestions"
+                      id="suggestions"
+                      aria-label="샘플 요청"
+                      aria-live="polite"
+                    ></div>
+                  </div>
+                </div>
+              </section>
+
+              <div
+                class="conversation"
+                id="conversation"
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions"
+                aria-label="Agent 대화"
+              >
+                <article class="message agent-message">
+                  <div class="message-avatar agent-avatar" aria-hidden="true">
+                    <img
+                      src="/images/bob-head.png"
+                      alt=""
+                      width="34"
+                      height="34"
+                    />
+                  </div>
+                  <div class="message-body">
+                    <div class="message-heading">
+                      <span class="message-label">Bob AI 에이전트</span>
+                      <time>지금</time>
+                    </div>
+                    <p>주문 번호나 확인할 내용을 입력하세요.</p>
+                  </div>
+                </article>
+              </div>
+            </div>
+            <div class="chat-composer">
+              <form class="composer" id="chat-form">
+                <label class="sr-only" for="chat-input"
+                  >에이전트에게 요청하기</label
+                >
+                <textarea
+                  id="chat-input"
+                  name="message"
+                  rows="2"
+                  maxlength="500"
+                  aria-describedby="chat-input-constraint"
+                  placeholder="메시지를 입력하세요"
+                  required
+                ></textarea>
+                <div class="composer-actions">
+                  <span class="composer-hint"
+                    >Enter 전송 · Shift+Enter 줄바꿈</span
+                  >
+                  <button id="send" type="submit" aria-label="메시지 보내기">
+                    <span
+                      class="carbon-icon icon-send"
+                      aria-hidden="true"
+                    ></span>
+                    <kbd>⌘ ↵</kbd>
+                  </button>
+                </div>
+                <span class="sr-only" id="chat-input-constraint">
+                  입력은 허용된 도구 스키마와 읽기 전용 고정 쿼리로 제한됩니다.
+                </span>
+              </form>
+            </div>
+          </section>
+
+          <aside
+            class="control-surface"
+            id="control-center"
+            aria-labelledby="control-title"
+          >
+            <header class="panel-header control-header">
+              <div class="panel-title">
+                <h2 id="control-title">접근제어</h2>
+              </div>
+              <div class="control-status">
+                <span class="status-spark" aria-hidden="true">✣</span>
+                <strong id="readiness" role="status" aria-live="polite"
+                  >확인 중</strong
+                >
+                <span
+                  class="planning-chip checking"
+                  id="planning-readiness"
+                  role="status"
+                  aria-live="polite"
+                  >계획 점검 중</span
+                >
+                <span class="sr-only" id="mode"
+                  >구성 상태를 확인하고 있습니다</span
+                >
+                <button
+                  id="demo-reset"
+                  type="button"
+                  aria-label="현재 데모 세션 초기화"
+                  title="데모 세션 초기화"
+                >
+                  초기화
+                </button>
+                <button
+                  id="refresh"
+                  type="button"
+                  aria-label="보안 이벤트 새로고침"
+                >
+                  <span
+                    class="carbon-icon icon-renew"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="sr-only refresh-label">새로고침</span>
+                </button>
+                <span
+                  class="sr-only"
+                  id="refresh-announcement"
+                  role="status"
+                  aria-live="polite"
+                ></span>
+              </div>
+            </header>
+
+            <div class="control-scroll">
+              <section
+                class="identity-path"
+                id="identity-path"
+                aria-labelledby="identity-path-title"
+              >
+                <div class="section-heading">
+                  <h3 id="identity-path-title">신원·권한 경로</h3>
+                  <div class="path-stage-overview" aria-live="polite">
+                    <span id="trace-stage-count">0/7</span>
+                    <span class="live-state waiting" id="trace-live-state"
+                      >요청 대기</span
+                    >
+                  </div>
+                </div>
+                <div
+                  class="path-progress"
+                  id="path-progress"
+                  role="progressbar"
+                  aria-label="현재 요청 처리 진행률"
+                  aria-valuemin="0"
+                  aria-valuemax="7"
+                  aria-valuenow="0"
+                >
+                  <span id="trace-progress-fill"></span>
+                </div>
+                <p class="path-progress-detail" id="trace-stage-detail">
+                  요청을 보내면 실제 보안 이벤트에 맞춰 현재 단계가 이동합니다.
+                </p>
+                <ol>
+                  <li
+                    id="path-step-verify"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="verify"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon verify-path-icon">
+                      <img
+                        src="/icons/ibm-security-verify.svg"
+                        alt=""
+                        width="30"
+                        height="30"
+                      />
+                    </span>
+                    <span class="path-copy">
+                      <strong>IBM Verify</strong
+                      ><small>신원 확인 및 인증</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                  <li
+                    id="path-step-agent"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="agent"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon bob-path-icon">
+                      <img
+                        src="/images/bob-head.png"
+                        alt=""
+                        width="32"
+                        height="32"
+                      />
+                    </span>
+                    <span class="path-copy">
+                      <strong>Bob AI 에이전트</strong
+                      ><small>의도 분석 및 계획 수립</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                  <li
+                    id="path-step-obo"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="obo"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon verify-path-icon">
+                      <img
+                        src="/icons/ibm-security-verify.svg"
+                        alt=""
+                        width="30"
+                        height="30"
+                      />
+                    </span>
+                    <span class="path-copy">
+                      <strong>Verify Token Exchange</strong
+                      ><small>RFC 8693 OBO JWT 발급</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                  <li
+                    id="path-step-gateway"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="gateway"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon mcp-path-icon">
+                      <span
+                        class="carbon-icon icon-network"
+                        aria-hidden="true"
+                      ></span>
+                    </span>
+                    <span class="path-copy">
+                      <strong>ContextForge Gateway</strong
+                      ><small>도구 라우팅 및 OBO 전달</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                  <li
+                    id="path-step-mcp"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="mcp"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon mcp-path-icon">
+                      <span
+                        class="carbon-icon icon-network"
+                        aria-hidden="true"
+                      ></span>
+                    </span>
+                    <span class="path-copy">
+                      <strong>MCP Server</strong
+                      ><small>도구 실행 및 요청 생성</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                  <li
+                    id="path-step-vault"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="vault"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon vault-path-icon">
+                      <img
+                        src="/icons/custom/hashicorp-vault.svg"
+                        alt=""
+                        width="34"
+                        height="34"
+                      />
+                    </span>
+                    <span class="path-copy">
+                      <strong>Vault</strong
+                      ><small>정책 평가 및 권한 부여</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                  <li
+                    id="path-step-database"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="dialog"
+                    data-stage="database"
+                  >
+                    <span class="path-node" aria-hidden="true">›</span>
+                    <span class="path-icon postgresql-path-icon">
+                      <img
+                        class="postgresql-logo"
+                        src="/icons/custom/postgresql-elephant.svg"
+                        alt=""
+                        width="30"
+                        height="31"
+                      />
+                    </span>
+                    <span class="path-copy">
+                      <strong>PostgreSQL</strong
+                      ><small>데이터베이스 실행</small>
+                    </span>
+                    <span class="path-state neutral">대기</span>
+                    <span class="path-meta"
+                      ><time>—</time><small>상세 보기</small></span
+                    >
+                  </li>
+                </ol>
+              </section>
+
+              <ol class="sr-only" id="trace" aria-live="polite">
+                <li>
+                  <span class="trace-index">01</span>
+                  <div>
+                    <strong>사용자 JWT</strong>
+                    <small>IBM Verify가 사용자 JWT를 검증합니다.</small>
+                  </div>
+                  <span class="trace-state waiting">대기</span>
+                </li>
+                <li>
+                  <span class="trace-index">02</span>
+                  <div>
+                    <strong>에이전트 OBO JWT</strong>
+                    <small>사용자와 에이전트 신원을 함께 증명합니다.</small>
+                  </div>
+                  <span class="trace-state waiting">대기</span>
+                </li>
+                <li>
+                  <span class="trace-index">03</span>
+                  <div>
+                    <strong>Vault 정책</strong>
+                    <small>역할과 클레임을 기준으로 권한을 평가합니다.</small>
+                  </div>
+                  <span class="trace-state waiting">대기</span>
+                </li>
+                <li>
+                  <span class="trace-index">04</span>
+                  <div>
+                    <strong>동적 DB 자격증명</strong>
+                    <small>짧은 TTL 자격증명을 발급합니다.</small>
+                  </div>
+                  <span class="trace-state waiting">대기</span>
+                </li>
+              </ol>
+
+              <section
+                class="access-status-panel"
+                id="current-access-status"
+                aria-labelledby="current-access-status-title"
+              >
+                <div class="section-heading access-status-heading">
+                  <h3 id="current-access-status-title">현재 접근 상태</h3>
+                  <span id="access-status-request">요청 대기</span>
+                </div>
+
+                <div
+                  class="access-status-summary waiting"
+                  id="access-status-summary"
+                >
+                  <span
+                    class="access-status-indicator"
+                    aria-hidden="true"
+                  ></span>
+                  <div>
+                    <strong id="access-status-result">요청 대기 중</strong>
+                    <p id="access-status-description">
+                      요청을 보내면 현재 신원·권한·데이터베이스 접근 상태를
+                      표시합니다.
+                    </p>
+                  </div>
+                  <span
+                    class="access-status-badge waiting"
+                    id="access-status-badge"
+                    >대기</span
+                  >
+                </div>
+
+                <dl class="access-status-details">
+                  <div>
+                    <dt>현재 단계</dt>
+                    <dd id="access-status-stage">대기</dd>
+                  </div>
+                  <div>
+                    <dt>Vault 권한</dt>
+                    <dd id="access-status-policy">평가 전</dd>
+                  </div>
+                  <div>
+                    <dt>DB 자격증명</dt>
+                    <dd id="access-status-credentials">미발급</dd>
+                  </div>
+                  <div>
+                    <dt>마지막 조치</dt>
+                    <dd id="access-status-action">기록 없음</dd>
+                  </div>
+                </dl>
+
+                <div
+                  class="access-status-recent"
+                  id="decision-counts"
+                  aria-label="최근 보안 이벤트 요약"
+                >
+                  <span>최근 이벤트 <b id="decision-total">0건</b></span>
+                  <span class="allowed">허용 <b id="count-allowed">0</b></span>
+                  <span class="denied">차단 <b id="count-denied">0</b></span>
+                  <span class="error">오류 <b id="count-error">0</b></span>
+                </div>
+              </section>
+
+              <section class="event-ledger" aria-labelledby="events-title">
+                <div class="section-heading events-heading">
+                  <h3 id="events-title">최근 보안 결정</h3>
+                  <div>
+                    <span id="last-updated">아직 업데이트되지 않았습니다</span>
+                  </div>
+                </div>
+                <ol id="events" class="event-list" aria-busy="true">
+                  <li class="state loading">보안 결정을 불러오는 중…</li>
+                </ol>
+              </section>
+            </div>
+          </aside>
+        </section>
+      </section>
+
+      <dialog
+        class="verify-demo-dialog"
+        id="verify-demo-dialog"
+        aria-labelledby="verify-demo-title"
+      >
+        <div class="verify-demo-shell">
+          <aside class="verify-demo-visual" aria-hidden="true">
+            <img
+              src="/images/verify-cloud-directory-demo.svg"
+              alt=""
+              width="760"
+              height="560"
+            />
+          </aside>
+
+          <section class="verify-demo-panel">
+            <button
+              class="verify-demo-close"
+              id="verify-demo-close"
+              type="button"
+              aria-label="Verify 데모 로그인 닫기"
+            >
+              <span
+                class="centered-glyph centered-glyph-close"
+                aria-hidden="true"
+                >×</span
+              >
+            </button>
+            <span class="verify-demo-badge">DEMO SIMULATION</span>
+
+            <form class="verify-demo-form" id="verify-demo-form">
+              <div class="verify-demo-brand">IBM Verify</div>
+              <h2 id="verify-demo-title">Cloud Directory(으)로 사인인</h2>
+
+              <label for="verify-demo-username">사용자 이름</label>
+              <input
+                id="verify-demo-username"
+                name="username"
+                type="text"
+                autocomplete="off"
+                placeholder="사용자 이름"
+                required
+              />
+
+              <div class="verify-password-label">
+                <label for="verify-demo-password">비밀번호</label>
+                <button type="button" tabindex="-1">
+                  비밀번호를 잊으셨습니까?
+                </button>
+              </div>
+              <div class="verify-password-field">
+                <input
+                  id="verify-demo-password"
+                  name="password"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="비밀번호"
+                  required
+                />
+                <button
+                  id="verify-demo-password-toggle"
+                  type="button"
+                  aria-label="비밀번호 표시"
+                >
+                  <span class="centered-glyph" aria-hidden="true">◉</span>
+                </button>
+              </div>
+
+              <div class="verify-demo-credentials" aria-label="가상 데모 계정">
+                <span>가상 데모 계정</span>
+                <code>unapproved.user@demo.local</code>
+                <code>DemoOnly!2026</code>
+                <button id="verify-demo-fill" type="button">자동 입력</button>
+              </div>
+
+              <p
+                class="verify-demo-error"
+                id="verify-demo-error"
+                role="alert"
+                hidden
+              >
+                가상 데모 계정 정보를 확인해 주세요.
+              </p>
+
+              <div class="verify-demo-submit-row">
+                <button id="verify-demo-submit" type="submit">사인인</button>
+              </div>
+              <button class="verify-passwordless" type="button" tabindex="-1">
+                비밀번호 없이 사인인
+              </button>
+            </form>
+
+            <section
+              class="verify-demo-result-panel"
+              id="verify-demo-result-panel"
+              hidden
+            >
+              <div class="verify-demo-brand">IBM Verify</div>
+              <span class="verify-demo-result-kicker">IDENTITY VERIFIED</span>
+              <h2>인증은 성공했지만 접근 권한이 없습니다</h2>
+              <p>
+                Cloud Directory가 사용자 신원을 확인하고 데모 JWT를
+                발급했습니다. 하지만 보호 데이터 access_tier 클레임이 없어
+                애플리케이션이 요청을 중단했습니다.
+              </p>
+
+              <ol class="verify-demo-result-steps">
+                <li class="complete">
+                  <span>1</span>
+                  <div>
+                    <strong>사용자 인증</strong
+                    ><small>Cloud Directory 자격 증명 확인</small>
+                  </div>
+                  <b>성공</b>
+                </li>
+                <li class="complete">
+                  <span>2</span>
+                  <div>
+                    <strong>사용자 JWT</strong
+                    ><small>sub·iss·aud·exp 클레임 발급</small>
+                  </div>
+                  <b>발급</b>
+                </li>
+                <li class="denied">
+                  <span>3</span>
+                  <div>
+                    <strong>애플리케이션 권한</strong
+                    ><small>필수 클레임: access_tier</small>
+                  </div>
+                  <b>차단</b>
+                </li>
+              </ol>
+
+              <div class="verify-demo-denial">
+                <strong>403 · 애플리케이션 접근 거부</strong>
+                <span
+                  >Agent, MCP, Vault, PostgreSQL은 호출되지 않았습니다.</span
+                >
+              </div>
+              <button id="verify-demo-finish" type="button">
+                차단 결과 확인
+              </button>
+            </section>
+
+            <footer class="verify-demo-footer">
+              Licensed Materials - Property of IBM 5725-X36 © Copyright IBM
+              Corp. 2017, 2024. All rights reserved. · International Business
+              Machines 상표
+            </footer>
+          </section>
+        </div>
+      </dialog>
+
+      <dialog
+        class="stage-dialog"
+        id="stage-dialog"
+        aria-labelledby="stage-dialog-title"
+        aria-describedby="stage-dialog-summary"
+      >
+        <div class="stage-dialog-shell">
+          <header class="stage-dialog-header">
+            <div>
+              <span class="stage-dialog-eyebrow" id="stage-dialog-eyebrow"
+                >접근 단계</span
+              >
+              <h2 id="stage-dialog-title">단계 상세</h2>
+            </div>
+            <button
+              class="stage-dialog-close"
+              type="button"
+              data-stage-dialog-close
+              aria-label="단계 상세 닫기"
+            >
+              <span
+                class="centered-glyph centered-glyph-close"
+                aria-hidden="true"
+                >×</span
+              >
+            </button>
+          </header>
+
+          <div class="stage-dialog-body">
+            <p class="stage-dialog-summary" id="stage-dialog-summary"></p>
+
+            <dl class="stage-dialog-status">
+              <div>
+                <dt>현재 상태</dt>
+                <dd id="stage-dialog-state">대기</dd>
+              </div>
+              <div>
+                <dt>최근 처리 시각</dt>
+                <dd id="stage-dialog-time">—</dd>
+              </div>
+            </dl>
+
+            <section
+              class="stage-dialog-section"
+              aria-labelledby="stage-action-title"
+            >
+              <h3 id="stage-action-title">보안 목적</h3>
+              <p id="stage-dialog-action"></p>
+            </section>
+
+            <section
+              class="stage-dialog-section"
+              aria-labelledby="stage-substeps-title"
+            >
+              <h3 id="stage-substeps-title">수행 단계</h3>
+              <ol class="stage-substeps" id="stage-dialog-substeps"></ol>
+            </section>
+
+            <section
+              class="stage-dialog-section"
+              aria-labelledby="stage-checks-title"
+            >
+              <h3 id="stage-checks-title">검증 결과</h3>
+              <dl class="stage-checks" id="stage-dialog-checks"></dl>
+            </section>
+
+            <section
+              class="stage-dialog-section"
+              aria-labelledby="stage-code-title"
+            >
+              <div class="stage-code-heading">
+                <h3 id="stage-code-title">요청·응답과 실행 코드</h3>
+                <button id="stage-code-copy" type="button">코드 복사</button>
+              </div>
+              <div
+                class="stage-code-tabs"
+                role="tablist"
+                aria-label="코드 보기"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  data-stage-code-view="request"
+                >
+                  요청 예시
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  tabindex="-1"
+                  data-stage-code-view="response"
+                >
+                  응답 예시
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  tabindex="-1"
+                  data-stage-code-view="execution"
+                >
+                  실행 코드
+                </button>
+              </div>
+              <pre><code id="stage-dialog-code"></code></pre>
+            </section>
+          </div>
+
+          <footer class="stage-dialog-footer">
+            <div class="stage-dialog-destination">
+              <span>실제 시스템 연결</span>
+              <strong id="stage-dialog-destination-title">연결 대상</strong>
+              <small id="stage-dialog-destination-note"
+                >운영자 인증과 네트워크 조건을 확인해 주세요.</small
+              >
+            </div>
+            <div class="stage-dialog-footer-actions">
+              <button
+                class="stage-dialog-secondary-action"
+                id="stage-dialog-secondary-action"
+                type="button"
+                hidden
+              >
+                연결 명령 복사
+              </button>
+              <a
+                class="stage-dialog-primary-action"
+                id="stage-dialog-open-link"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                hidden
+              >
+                <span id="stage-dialog-open-link-label">실제 UI 열기</span>
+                <span class="carbon-icon icon-launch" aria-hidden="true"></span>
+              </a>
+              <button
+                class="stage-dialog-primary-action"
+                id="stage-dialog-open-action"
+                type="button"
+                hidden
+              >
+                Agent 대화로 이동
+              </button>
+              <button
+                class="stage-dialog-close-action"
+                type="button"
+                data-stage-dialog-close
+              >
+                닫기
+              </button>
+            </div>
+          </footer>
+        </div>
+      </dialog>
+    </main>
+
+    <footer class="site-footer">
+      <span>bob-vault-nhi-demo</span>
+      <span id="service-version">버전 —</span>
+      <span>MCP 프로토콜 2025-11-25</span>
+    </footer>
+  </body>
+</html>

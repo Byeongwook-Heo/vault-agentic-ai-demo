@@ -1,0 +1,16 @@
+{
+  "vpc_id": "REPLACE_VPC_ID",
+  "public_subnet_ids": ["REPLACE_PUBLIC_SUBNET_A", "REPLACE_PUBLIC_SUBNET_B"],
+  "app_subnet_ids": ["REPLACE_APP_SUBNET_A", "REPLACE_APP_SUBNET_B"],
+  "database_subnet_ids": ["REPLACE_DB_SUBNET_A", "REPLACE_DB_SUBNET_B"],
+  "hosted_zone_id": "REPLACE_PUBLIC_HOSTED_ZONE_ID",
+  "public_zone_name": "demo.example.com",
+  "vault_ami_id": "REPLACE_APPROVED_X86_64_AMI",
+  "vault_ami_owner": "REPLACE_TRUSTED_AMI_OWNER",
+  "event_operator_principal_arns": ["arn:aws:iam::123456789012:role/demo-operator"],
+  "event_ssh_users": {},
+  "event_access_expires_at": "REPLACE_RFC3339_UTC",
+  "event_ssh_expires_at": "REPLACE_YYYYMMDDHHMMSS",
+  "event_ssh_expiry_calendar": "REPLACE_SYSTEMD_UTC_CALENDAR",
+  "verify_jwks_source_cidrs": ["REPLACE_VERIFY_REGIONAL_EGRESS_IPV4/32"]
+}

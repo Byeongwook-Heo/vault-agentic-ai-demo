@@ -1,0 +1,130 @@
+/* IBM Plex and Carbon assets are vendored for CSP-safe, offline rendering. */
+@font-face {
+  font-family: "IBM Plex Sans KR";
+  src: url("/fonts/IBMPlexSansKR-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans KR";
+  src: url("/fonts/IBMPlexSansKR-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans KR";
+  src: url("/fonts/IBMPlexSansKR-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans KR";
+  src: url("/fonts/IBMPlexSansKR-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/IBMPlexMono-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+.carbon-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  -webkit-mask: var(--carbon-icon) center / contain no-repeat;
+  mask: var(--carbon-icon) center / contain no-repeat;
+}
+
+.icon-security-services {
+  --carbon-icon: url("/icons/carbon/security-services.svg");
+}
+
+.icon-launch {
+  --carbon-icon: url("/icons/carbon/launch.svg");
+}
+
+.icon-logout {
+  --carbon-icon: url("/icons/carbon/logout.svg");
+}
+
+.icon-delivery {
+  --carbon-icon: url("/icons/carbon/delivery.svg");
+}
+
+.icon-chart-bar {
+  --carbon-icon: url("/icons/carbon/chart--bar.svg");
+}
+
+.icon-policy {
+  --carbon-icon: url("/icons/carbon/policy.svg");
+}
+
+.icon-send {
+  --carbon-icon: url("/icons/carbon/send.svg");
+}
+
+.icon-user-id {
+  --carbon-icon: url("/icons/carbon/user--identification.svg");
+}
+
+.icon-connection-send {
+  --carbon-icon: url("/icons/carbon/connection--send.svg");
+}
+
+.icon-postgresql {
+  --carbon-icon: url("/icons/carbon/database--postgreSQL.svg");
+}
+
+.icon-renew {
+  --carbon-icon: url("/icons/carbon/renew.svg");
+}
+
+.icon-locked {
+  --carbon-icon: url("/icons/carbon/locked.svg");
+}
+
+.icon-bot {
+  --carbon-icon: url("/icons/carbon/bot.svg");
+}
+
+.icon-network {
+  --carbon-icon: url("/icons/carbon/network--4.svg");
+}
+
+.icon-cloud-auditing {
+  --carbon-icon: url("/icons/carbon/cloud--auditing.svg");
+}
+
+.icon-warning {
+  --carbon-icon: url("/icons/carbon/warning.svg");
+}
+
+.icon-check-filled {
+  --carbon-icon: url("/icons/carbon/checkmark--filled.svg");
+}
+
+.icon-security {
+  --carbon-icon: url("/icons/carbon/security.svg");
+}

@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+vault_host="${vault_private_dns_name}"
+key_expiry="${event_ssh_expires_at}"
+
+%{ for username, config in event_ssh_users ~}
+event_user="${username}"
+id "$${event_user}" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$${event_user}"
+event_password_hash="$(openssl passwd -6 "$(openssl rand -hex 32)")"
+usermod --password "$${event_password_hash}" "$${event_user}"
+unset event_password_hash
+install -d -m 0700 -o "$${event_user}" -g "$${event_user}" "/home/$${event_user}/.ssh"
+public_key="$(printf '%s' '${base64encode(config.public_key)}' | base64 --decode)"
+printf 'command="/bin/false",no-agent-forwarding,no-X11-forwarding,no-pty,permitopen="%s:22",expiry-time="%s" %s\n' \
+  "$${vault_host}" "$${key_expiry}" "$${public_key}" \
+  > "/home/$${event_user}/.ssh/authorized_keys"
+chown "$${event_user}:$${event_user}" "/home/$${event_user}/.ssh/authorized_keys"
+chmod 0600 "/home/$${event_user}/.ssh/authorized_keys"
+unset public_key
+%{ endfor ~}
+
+cat > /etc/ssh/sshd_config.d/99-bob-event-bastion.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+AllowAgentForwarding no
+AllowTcpForwarding local
+X11Forwarding no
+PermitTunnel no
+GatewayPorts no
+PermitTTY no
+MaxAuthTries 3
+MaxSessions 2
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+AllowUsers ${join(" ", keys(event_ssh_users))}
+EOF
+
+cat > /usr/local/sbin/expire-bob-event-ssh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+for event_user in ${join(" ", keys(event_ssh_users))}; do
+  if id "$${event_user}" >/dev/null 2>&1; then
+    : > "/home/$${event_user}/.ssh/authorized_keys"
+    chown "$${event_user}:$${event_user}" "/home/$${event_user}/.ssh/authorized_keys"
+    chmod 0600 "/home/$${event_user}/.ssh/authorized_keys"
+    pkill -KILL -u "$${event_user}" >/dev/null 2>&1 || true
+    usermod --lock "$${event_user}" >/dev/null 2>&1 || true
+  fi
+done
+EOF
+chmod 0700 /usr/local/sbin/expire-bob-event-ssh
+
+cat > /etc/systemd/system/bob-event-ssh-expire.service <<'EOF'
+[Unit]
+Description=Expire Bob Vault event SSH access
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/expire-bob-event-ssh
+EOF
+
+cat > /etc/systemd/system/bob-event-ssh-expire.timer <<'EOF'
+[Unit]
+Description=Expire Bob Vault event SSH access on schedule
+
+[Timer]
+OnCalendar=${event_ssh_expiry_calendar}
+Persistent=true
+Unit=bob-event-ssh-expire.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+sshd -t
+systemctl reload ssh
+systemctl daemon-reload
+systemctl enable --now bob-event-ssh-expire.timer

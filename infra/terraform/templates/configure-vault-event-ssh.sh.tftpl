@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+%{ for username, config in event_ssh_users ~}
+event_user="${username}"
+id "$${event_user}" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$${event_user}"
+install -d -m 0700 -o "$${event_user}" -g "$${event_user}" "/home/$${event_user}/.ssh"
+public_key="$(printf '%s' '${base64encode(config.public_key)}' | base64 --decode)"
+printf '%s\n' "$${public_key}" > "/home/$${event_user}/.ssh/authorized_keys"
+chown "$${event_user}:$${event_user}" "/home/$${event_user}/.ssh/authorized_keys"
+chmod 0600 "/home/$${event_user}/.ssh/authorized_keys"
+unset public_key
+%{ endfor ~}

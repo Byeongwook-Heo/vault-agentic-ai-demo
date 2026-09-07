@@ -1,0 +1,11 @@
+.git
+.github
+.terraform
+**/.terraform
+**/node_modules
+**/dist
+**/coverage
+*.tfstate*
+.env*
+Downloads
+docs

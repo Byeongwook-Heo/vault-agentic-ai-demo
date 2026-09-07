@@ -1,0 +1,25 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - set -euo pipefail
+      - REGISTRY_HOST="${ECR_REPOSITORY_URI%%/*}"
+      - aws ecr get-login-password | docker login --username AWS --password-stdin "${REGISTRY_HOST}"
+      - IMAGE_TAG="$(printf '%s' "${CODEBUILD_BUILD_ID}" | sha256sum | cut -c1-16)"
+  build:
+    commands:
+      - docker build --pull --file apps/mcp-server/Dockerfile --tag "${ECR_REPOSITORY_URI}:${IMAGE_TAG}" .
+      - docker push "${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
+  post_build:
+    commands:
+      - |
+        if [[ "${CODEBUILD_BUILD_SUCCEEDING}" = "1" ]]; then
+          IMAGE_DIGEST="$(aws ecr describe-images --repository-name "${PROJECT_NAME}" --image-ids imageTag="${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+          test -n "${IMAGE_DIGEST}" -a "${IMAGE_DIGEST}" != "None"
+          aws ssm put-parameter --name "/${PROJECT_NAME}/image-uri" --type String --overwrite --value "${ECR_REPOSITORY_URI}@${IMAGE_DIGEST}" >/dev/null
+          echo "Published immutable image digest to SSM."
+        fi

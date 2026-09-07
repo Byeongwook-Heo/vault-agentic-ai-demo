@@ -1,0 +1,40 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - ./scripts/install-vault.sh
+      - ./scripts/install-postgresql-client.sh
+      - |
+        if [[ "${SKIP_BOOTSTRAP_NODE_BUILD:-false}" != "true" ]]; then
+          npm ci --ignore-scripts
+          npm run build
+        else
+          echo "SKIP_BOOTSTRAP_NODE_BUILD=true, skipping npm ci / npm run build."
+        fi
+  build:
+    commands:
+      - |
+        set -euo pipefail
+        case "${BOOTSTRAP_ACTION:-status}" in
+          status) ./bootstrap/aws/status.sh ;;
+          vault-init) ./bootstrap/aws/vault-init.sh ;;
+          db-bootstrap) ./bootstrap/aws/db-bootstrap.sh ;;
+          vault-bootstrap) ./bootstrap/aws/vault-bootstrap.sh ;;
+          access-tier-smoke) ./bootstrap/aws/access-tier-smoke.sh ;;
+          demo-access-report) ./bootstrap/aws/demo-access-report.sh ;;
+          rds-data-report) ./bootstrap/aws/rds-data-report.sh ;;
+          verify-preflight) ./bootstrap/aws/verify-preflight.sh ;;
+          verify-client-jwt-plan) ./bootstrap/aws/verify-client-enable-jwt.sh plan ;;
+          verify-client-enable-jwt) ./bootstrap/aws/verify-client-enable-jwt.sh apply ;;
+          smoke) ./bootstrap/aws/smoke.sh ;;
+          *)
+            echo "Unsupported BOOTSTRAP_ACTION: ${BOOTSTRAP_ACTION}" >&2
+            exit 2
+            ;;
+        esac

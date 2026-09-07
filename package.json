@@ -1,0 +1,35 @@
+{
+  "name": "bob-vault-nhi-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IBM Verify authenticated chatbot, MCP Agent, HashiCorp Vault Enterprise, and Amazon RDS security demo.",
+  "engines": {
+    "node": "22.23.1",
+    "npm": "10.9.8"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "check:publication": "node scripts/check-publication.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test:bootstrap && npm run test --workspaces --if-present",
+    "test:bootstrap": "node --test bootstrap/aws/*.test.mjs",
+    "test:unit": "npm run test --workspace @bob-vault-nhi-demo/mcp-server -- --exclude test/integration/**",
+    "test:integration": "npm run test --workspace @bob-vault-nhi-demo/mcp-server -- test/integration",
+    "security:deps": "npm audit --audit-level=high --omit=dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.1",
+    "eslint": "10.8.0",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0"
+  }
+}
